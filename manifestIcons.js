@@ -24,6 +24,6 @@ console.log(icons);
 
 const manifest = JSON.parse(fs.readFileSync("./public/manifest.json"));
 manifest.icons = icons;
-manifest.browser_action.default_icon = icons;
+manifest.action.default_icon = icons;
 
 fs.writeFileSync("./public/manifest.json", JSON.stringify(manifest, null, 2));

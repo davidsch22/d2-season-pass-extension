@@ -4,10 +4,10 @@ const MiniCssExtractPlugin = require("mini-css-extract-plugin");
 
 module.exports = {
   entry: {
-    background: "./src/background.ts",
+    serviceWorker: "./src/serviceWorker.ts",
     contentScript: "./src/contentScript.ts",
     injected: "./src/injected.ts",
-    browserAction: "./src/browserAction/index.ts",
+    action: "./src/action/index.ts",
   },
   devtool: "source-map",
   output: {

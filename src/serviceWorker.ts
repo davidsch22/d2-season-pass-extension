@@ -6,20 +6,24 @@ import { changesToValues, hasTimedout } from "./utils";
 
 import debug from "debug";
 
-localStorage.debug = "*";
+browser.storage.local.set({ debug: "*" });
 debug.enabled("*");
 
 const log = debug("background");
 
-let seasonOverride = -1;
-let bungieApiKey: string | undefined = undefined;
-let lastChangedDate = 0;
+//let seasonOverride = -1;
+//let bungieApiKey: string | undefined = undefined;
+//let lastChangedDate = 0;
 
 const allBgImages = SEASONS.map(
   (v) => `https://www.bungie.net${v.progressPageImage}`
 );
 
-browser.storage.onChanged.addListener((changes, area) => {
+browser.storage.onChanged.addListener(async (changes, area) => {
+  const { seasonOverride, bungieApiKey } = await browser.storage.local.get([
+    "seasonOverride",
+    "bungieApiKey",
+  ]);
   const prevSeasonOverride = seasonOverride;
 
   log("storage.onChanged emitted", changes);
@@ -77,10 +81,7 @@ chromeOnlySettingsIntercept();
 //   chromeOnlySettingsIntercept();
 // }
 
-const wait = (timeout: number) =>
-  new Promise((resolve) => setTimeout(resolve, timeout));
-
-function unpackStorageValues(values: Record<string, any>) {
+async function unpackStorageValues(values: Record<string, any>) {
   console.groupCollapsed("Synced storage values to local variables");
   log("Values:", values);
 
@@ -91,18 +92,25 @@ function unpackStorageValues(values: Record<string, any>) {
     return;
   }
 
+  const { seasonOverride, bungieApiKey, lastChangedDate } =
+    await browser.storage.local.get([
+      "seasonOverride",
+      "bungieApiKey",
+      "lastChangedDate",
+    ]);
+
   if (values.seasonHash) {
-    seasonOverride = Number(values.seasonHash);
+    browser.storage.local.set({ seasonOverride: Number(values.seasonHash) });
     log("seasonOverride", seasonOverride);
   }
 
   if (values.bungieApiKey) {
-    bungieApiKey = values.bungieApiKey;
+    browser.storage.local.set({ bungieApiKey: values.bungieApiKey });
     log("bungieApiKey", bungieApiKey);
   }
 
   if (values.lastChangedDate) {
-    lastChangedDate = values.lastChangedDate;
+    browser.storage.local.set({ lastChangedDate: values.lastChangedDate });
     log("lastChangedDate", lastChangedDate);
   }
 
@@ -152,11 +160,16 @@ async function interceptPlatformHeaders(
 /**
  * Intercepts requests for season background images to return the background image for the overridden season
  */
-function interceptBackgroundImages(
+async function interceptBackgroundImages(
   request: browser.WebRequest.OnSendHeadersDetailsType
-): { redirectUrl: string } | undefined {
+): Promise<{ redirectUrl: string } | { cancel: boolean }> {
+  const { lastChangedDate, seasonOverride } = await browser.storage.local.get([
+    "lastChangedDate",
+    "seasonOverride",
+  ]);
+
   if (hasTimedout(lastChangedDate)) {
-    return undefined;
+    return { cancel: true };
   }
 
   const requestedImagePathname = new URL(request.url).pathname;
@@ -170,13 +183,13 @@ function interceptBackgroundImages(
   if (!seasonForOverride) {
     log("Could not find season data for the override");
     console.groupEnd();
-    return undefined;
+    return { cancel: true };
   }
 
   if (seasonForOverride.progressPageImage === requestedImagePathname) {
     log("Correct image anyway");
     console.groupEnd();
-    return undefined;
+    return { cancel: true };
   }
 
   const requestedSeason = SEASONS.find(
@@ -196,31 +209,36 @@ function interceptBackgroundImages(
   }
 
   console.groupEnd();
-  return undefined;
+  return { cancel: true };
 }
 
 /**
  * Intercepts requests for the Settings endpoint and potentially provides a modified response
  */
-function chromeInterceptSettingsRequest(
+async function chromeInterceptSettingsRequest(
   request: browser.WebRequest.OnBeforeSendHeadersDetailsType
-) {
+): Promise<{ redirectUrl: string } | { cancel: boolean }> {
+  const { lastChangedDate, seasonOverride } = await browser.storage.local.get([
+    "lastChangedDate",
+    "seasonOverride",
+  ]);
+
   const logIntercept = debug("background:intercept:" + request.requestId);
   logIntercept("Intercepted settings request", request.url);
 
   if (request.url.includes("?seasonPassPass")) {
     logIntercept("Intercepted our own request. Stopping.");
-    return;
+    return { cancel: true };
   }
 
   if (hasTimedout(lastChangedDate)) {
     logIntercept("Has timed out. Stopping.");
-    return;
+    return { cancel: true };
   }
 
   if (!seasonOverride) {
     logIntercept("Don't have a season override. Stopping.");
-    return;
+    return { cancel: true };
   }
 
   return {

@@ -2,9 +2,10 @@
   "name": "Season Pass Pass",
   "description": "Travel back in time and pull rewards from any previous season pass",
   "version": "1.1.0",
-  "manifest_version": 2,
+  "manifest_version": 3,
   "background": {
-    "scripts": ["background.bundle.js"]
+    "service_worker": "serviceWorker.bundle.js",
+    "type": "module"
   },
   "icons": {
     "16": "icons/icon_16.png",
@@ -15,14 +16,15 @@
     "128": "icons/icon_128.png",
     "256": "icons/icon_128@2x.png"
   },
-  "permissions": [
-    "storage",
-    "webRequest",
-    "webRequestBlocking",
-    "*://*.bungie.net/*"
+  "permissions": ["storage", "webRequest", "declarativeNetRequest"],
+  "host_permissions": ["*://*.bungie.net/*"],
+  "web_accessible_resources": [
+    {
+      "resources": ["injected.bundle.js"],
+      "matches": ["*://*.bungie.net/*"]
+    }
   ],
-  "web_accessible_resources": ["injected.bundle.js"],
-  "browser_action": {
+  "action": {
     "default_icon": {
       "16": "icons/icon_16.png",
       "32": "icons/icon_32.png",
@@ -33,6 +35,19 @@
       "256": "icons/icon_128@2x.png"
     },
     "default_title": "Season Pass Pass",
-    "default_popup": "browserAction.html"
+    "default_popup": "action.html"
+  },
+  "declarative_net_request": {
+    "rule_resources": [
+      {
+        "id": 1,
+        "priority": 1,
+        "action": { "type": "redirect", "redirect": { "url": "" } },
+        "condition": {
+          "urlFilter": "",
+          "resource_types": ["main_frame"]
+        }
+      }
+    ]
   }
 }
